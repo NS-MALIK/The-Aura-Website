@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
   ChevronRight, Calendar, Clock, ExternalLink, 
-  CheckCircle, XCircle, ChevronDown, ChevronUp, MessageSquare 
+  CheckCircle, XCircle, ChevronDown, ChevronUp, MessageSquare, Mail 
 } from 'lucide-react';
 import postsData from '../data/posts.json';
 import favicon from '/assets/favicon.svg';
@@ -14,13 +14,16 @@ export default function ArticleView() {
   // Find current post based on URL slug, fallback to first if not found[cite: 1]
   const post = postsData.find(p => p.slug === slug) || postsData[0];
 
-  // State for FAQ accordions and user comments[cite: 1]
   const [openFaq, setOpenFaq] = useState(null);
   const [comments, setComments] = useState([
     { id: 1, name: "Sarah M.", text: "This guide was extremely helpful! Decided to try out the product mentioned.", date: "Yesterday" }
   ]);
   const [newCommentName, setNewCommentName] = useState('');
   const [newCommentText, setNewCommentText] = useState('');
+
+  // Newsletter form state
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterSubscribed, setNewsletterSubscribed] = useState(false);
 
   const toggleFaq = (index) => {
     setOpenFaq(openFaq === index ? null : index);
@@ -35,41 +38,59 @@ export default function ArticleView() {
     }
   };
 
+  const handleNewsletterSubmit = async (e) => {
+    e.preventDefault();
+    if (!newsletterEmail) return;
+
+    try {
+      const response = await fetch("https://formspree.io/f/mgaengaz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email: newsletterEmail })
+      });
+
+      if (response.ok) {
+        setNewsletterSubscribed(true);
+        setNewsletterEmail('');
+      } else {
+        alert("Something went wrong. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
+    }
+  };
+
   // Filter out current post for the "Related Articles" section automatically[cite: 1]
   const relatedPosts = postsData.filter(p => p.slug !== post.slug).slice(0, 2);
 
-  // Dynamic SEO variables
   const pageTitle = `${post.title} | Curated Shopping Guide`;
   const metaDescription = `${post.excerpt.slice(0, 140)}... Check prices and availability on Amazon today!`;
   const canonicalUrl = window.location.href;
+  const imageSource = post.image;
 
   return (
     <>
-      {/* Dynamic SEO & Open Graph Meta Tags Header */}
       <Helmet>
         <title>{pageTitle}</title>
         <meta name="description" content={metaDescription} />
         <link rel="canonical" href={canonicalUrl} />
-
-        {/* Open Graph / Facebook / Pinterest / LinkedIn Meta Tags */}
         <meta property="og:type" content="article" />
         <meta property="og:title" content={post.title} />
         <meta property="og:description" content={metaDescription} />
-        <meta property="og:image" content={post.image} />
+        <meta property="og:image" content={imageSource} />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:site_name" content="Naila Curates" />
-
-        {/* Twitter Card Meta Tags */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={post.title} />
         <meta name="twitter:description" content={metaDescription} />
-        <meta name="twitter:image" content={post.image} />
+        <meta name="twitter:image" content={imageSource} />
       </Helmet>
 
       <article className="bg-[#FDFBF7] py-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           
-          {/* Breadcrumb Navigation (Home > Category > Post Title) */}
           <nav className="flex items-center space-x-2 text-xs text-stone-500 font-medium" aria-label="Breadcrumb">
             <Link to="/" className="hover:text-stone-900 transition">Home</Link>
             <ChevronRight size={14} className="text-stone-400" />
@@ -78,18 +99,15 @@ export default function ArticleView() {
             <span className="text-stone-900 truncate max-w-xs">{post.title}</span>
           </nav>
 
-          {/* Article Header & E-E-A-T Metadata */}
           <header className="space-y-6 border-b border-stone-200 pb-8">
             <span className="bg-amber-800 text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full">
               {post.category}
             </span>
             
-            {/* H1: Main Keyword + Power Word/Modifier (Strictly 1 per page) */}
             <h1 className="text-3xl sm:text-5xl font-serif text-stone-900 leading-tight">
               {post.title}
             </h1>
 
-            {/* Author E-E-A-T Meta: Author Name, Last Updated Date, & Read Time */}
             <div className="flex flex-wrap items-center gap-6 text-xs text-stone-500 pt-2">
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 rounded-full bg-amber-900 text-white flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
@@ -108,7 +126,6 @@ export default function ArticleView() {
             </div>
           </header>
 
-          {/* Table of Contents (TOC) with Jump Links matching fragment IDs */}
           <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm">
             <h3 className="font-serif font-bold text-stone-900 text-base mb-3">Table of Contents</h3>
             <ul className="space-y-2 text-sm text-stone-600">
@@ -120,7 +137,6 @@ export default function ArticleView() {
             </ul>
           </div>
 
-          {/* Introduction Section: Hook user, state search intent, LSI keywords, FTC Disclosure */}
           <section id="introduction" className="prose prose-stone max-w-none text-stone-700 font-light leading-relaxed space-y-4">
             <p className="text-lg font-normal text-stone-900">
               {post.excerpt}
@@ -134,12 +150,17 @@ export default function ArticleView() {
             </div>
           </section>
 
-          {/* Featured Image */}
           <div className="aspect-[16/9] rounded-2xl overflow-hidden bg-stone-100 shadow-md">
-            <img src={post.image} alt={post.title} className="w-full h-full object-cover" />
+            <img 
+              src={imageSource} 
+              alt={post.title} 
+              className="w-full h-full object-cover" 
+              onError={(e) => {
+                e.target.src = "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80";
+              }}
+            />
           </div>
 
-          {/* Featured Product Quick Comparison Box / Grid */}
           <section id="quick-comparison" className="bg-[#F4EFEB] border border-stone-300/60 rounded-3xl p-8 space-y-6">
             <div className="text-center max-w-lg mx-auto">
               <span className="text-xs uppercase tracking-widest text-amber-800 font-bold">Top Recommendation</span>
@@ -148,7 +169,11 @@ export default function ArticleView() {
 
             <div className="bg-white rounded-2xl p-6 border border-stone-200 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
               <div className="flex items-center space-x-4">
-                <img src={post.image} alt={post.topPick ? post.topPick.name : post.title} className="w-20 h-20 rounded-xl object-cover bg-stone-100 shrink-0" />
+                <img 
+                  src={imageSource} 
+                  alt={post.topPick ? post.topPick.name : post.title} 
+                  className="w-20 h-20 rounded-xl object-cover bg-stone-100 shrink-0" 
+                />
                 <div>
                   <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2.5 py-1 rounded">Best Overall</span>
                   <h3 className="font-serif text-lg text-stone-900 mt-1">
@@ -161,7 +186,7 @@ export default function ArticleView() {
               </div>
 
               <a 
-                href={post.topPick ? post.topPick.affiliateUrl : "https://a.co/d/00Q3O7SB"} 
+                href={post.topPick?.affiliateUrl || "https://amazon.com"} 
                 target="_blank" 
                 rel="sponsored noopener noreferrer"
                 className="px-6 py-3.5 bg-stone-900 hover:bg-stone-800 text-white rounded-xl font-medium text-xs transition flex items-center space-x-2 shrink-0 shadow"
@@ -172,7 +197,6 @@ export default function ArticleView() {
             </div>
           </section>
 
-          {/* Main Section Heading & In-Depth Pros/Cons Breakdown */}
           <section id="in-depth-review" className="space-y-6">
             <h2 className="text-2xl font-serif text-stone-900">What to Look For & Performance Breakdown</h2>
             <p className="text-stone-600 text-sm font-light leading-relaxed">
@@ -180,34 +204,25 @@ export default function ArticleView() {
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-              {/* Pros */}
               <div className="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-6 space-y-3">
                 <h3 className="font-serif font-bold text-emerald-900 text-base flex items-center space-x-2">
                   <CheckCircle size={18} className="text-emerald-700" />
                   <span>The Pros</span>
                 </h3>
                 <ul className="space-y-2 text-xs text-stone-700">
-                  {(post.pros || [
-                    "Sleek ergonomic design fitting easily into travel bags or vanities.",
-                    "Noticeable performance improvements with regular usage.",
-                    "High quality manufacturing standards backed by solid durability."
-                  ]).map((pro, idx) => (
+                  {(post.pros || []).map((pro, idx) => (
                     <li key={idx} className="flex items-start space-x-2"><span>&bull;</span><span>{pro}</span></li>
                   ))}
                 </ul>
               </div>
 
-              {/* Cons */}
               <div className="bg-rose-50/60 border border-rose-200 rounded-2xl p-6 space-y-3">
                 <h3 className="font-serif font-bold text-rose-900 text-base flex items-center space-x-2">
                   <XCircle size={18} className="text-rose-700" />
                   <span>Things to Consider</span>
                 </h3>
                 <ul className="space-y-2 text-xs text-stone-700">
-                  {(post.cons || [
-                    "High demand frequently causes temporary inventory shortages.",
-                    "Requires routine application or care for optimal longevity."
-                  ]).map((con, idx) => (
+                  {(post.cons || []).map((con, idx) => (
                     <li key={idx} className="flex items-start space-x-2"><span>&bull;</span><span>{con}</span></li>
                   ))}
                 </ul>
@@ -215,15 +230,11 @@ export default function ArticleView() {
             </div>
           </section>
 
-          {/* FAQ Section (Accordion HTML structure) */}
           <section id="faq" className="space-y-6 pt-6 border-t border-stone-200">
             <h2 className="text-2xl font-serif text-stone-900">Frequently Asked Questions</h2>
             
             <div className="space-y-3">
-              {(post.faqs || [
-                { q: "How often should I use this item or product?", a: "For optimal results, follow standard recommended schedules integrated into your daily routine." },
-                { q: "Are these items covered by standard Amazon returns?", a: "Yes, all recommended items fulfilled via Amazon qualify for standard 30-day return policies." }
-              ]).map((faq, index) => (
+              {(post.faqs || []).map((faq, index) => (
                 <div key={index} className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
                   <button 
                     onClick={() => toggleFaq(index)}
@@ -242,29 +253,60 @@ export default function ArticleView() {
             </div>
           </section>
 
-          {/* Conclusion & Final Buying Guide Recommendation Summary */}
           <section id="conclusion" className="bg-white border border-stone-200 rounded-3xl p-8 space-y-4 shadow-sm">
             <h2 className="text-2xl font-serif text-stone-900">Conclusion & Final Buying Guide Recommendation Summary</h2>
-            <div 
-              dangerouslySetInnerHTML={{ 
-                __html: post.conclusion || `To wrap up our review on ${post.title}, choosing this solution provides exceptional everyday utility and long-term value. Be sure to check active availability and secure your order directly through our verified storefront link below.` 
-              }} 
-              className="text-stone-600 text-sm font-light leading-relaxed space-y-3 [&>a]:text-amber-800 [&>a]:underline [&>a]:font-medium hover:[&>a]:text-stone-900"
-            />
+            <p className="text-stone-600 text-sm font-light leading-relaxed">
+              {post.conclusion}
+            </p>
             <div className="pt-2">
               <a 
-                href={post.topPick ? post.topPick.affiliateUrl : "https://a.co/d/00Q3O7SB"} 
+                href={post.topPick?.affiliateUrl || "https://amazon.com"} 
                 target="_blank" 
                 rel="sponsored noopener noreferrer"
                 className="inline-flex items-center space-x-2 px-8 py-4 bg-stone-900 hover:bg-stone-800 text-white rounded-xl font-medium text-xs transition shadow"
               >
-                <span>View Availability on Amazon Storefront</span>
+                <span>View Specific Idea List on Amazon</span>
                 <ExternalLink size={14} />
               </a>
             </div>
           </section>
 
-          {/* Author Bio Box */}
+          {/* Email Newsletter Subscription Box (Strategic High-Conversion Placement) */}
+          <section className="bg-gradient-to-br from-stone-900 to-stone-800 text-white rounded-3xl p-8 sm:p-10 space-y-6 shadow-md text-center">
+            <div className="w-12 h-12 bg-amber-800 text-white rounded-2xl mx-auto flex items-center justify-center shadow">
+              <Mail size={22} />
+            </div>
+            <div className="space-y-2 max-w-lg mx-auto">
+              <h2 className="text-2xl font-serif">Get Curated Finds Delivered</h2>
+              <p className="text-xs text-stone-300 font-light leading-relaxed">
+                Join our exclusive subscriber list to receive hand-picked Amazon storefront updates, seasonal skincare finds, and quiet luxury trends straight to your inbox.
+              </p>
+            </div>
+
+            {newsletterSubscribed ? (
+              <div className="bg-emerald-900/50 border border-emerald-500/50 text-emerald-200 text-xs p-4 rounded-xl max-w-md mx-auto font-medium">
+                Thank you for subscribing! You're all set to receive our latest updates.
+              </div>
+            ) : (
+              <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
+                <input 
+                  type="email" 
+                  required
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  placeholder="Enter your email address..." 
+                  className="flex-1 px-4 py-3 rounded-xl bg-stone-800 border border-stone-700 text-white placeholder-stone-400 text-xs focus:outline-none focus:border-amber-700"
+                />
+                <button 
+                  type="submit"
+                  className="px-6 py-3 bg-amber-800 hover:bg-amber-700 text-white rounded-xl font-medium text-xs transition shrink-0 shadow"
+                >
+                  Subscribe
+                </button>
+              </form>
+            )}
+          </section>
+
           <div className="bg-[#EFECE6] border border-stone-300/60 rounded-3xl p-8 flex flex-col sm:flex-row items-center gap-6">
             <div className="w-20 h-20 rounded-full bg-stone-900 text-white flex items-center justify-center shrink-0 shadow-md overflow-hidden">
               <img src={favicon} alt="Naila Avatar" className="w-20 h-20 object-contain" />
@@ -277,7 +319,6 @@ export default function ArticleView() {
             </div>
           </div>
 
-          {/* Related Posts Grid (Internal Contextual Linking) */}
           {relatedPosts.length > 0 && (
             <section className="space-y-6 pt-6 border-t border-stone-200">
               <h2 className="text-2xl font-serif text-stone-900">Related Posts</h2>
@@ -300,7 +341,6 @@ export default function ArticleView() {
             </section>
           )}
 
-          {/* Comments Section */}
           <section className="space-y-8 pt-6 border-t border-stone-200">
             <div className="flex items-center space-x-2">
               <MessageSquare size={20} className="text-stone-800" />
